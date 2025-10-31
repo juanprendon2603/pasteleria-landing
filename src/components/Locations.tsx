@@ -42,7 +42,7 @@ function waLink(num?: string, text?: string) {
 
 function Panel({ b, reverse }: { b: LocalBranch; reverse?: boolean }) {
   const onSave = () =>
-    downloadVCard(b.name.replaceAll(' ', '_'), buildBranchVCard(b))
+    downloadVCard(b.name.replace(/\s+/g, '_'), buildBranchVCard(b))
 
   return (
     <article className={`branch-panel ${reverse ? 'reverse' : ''}`} data-reveal>
