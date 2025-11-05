@@ -3,6 +3,7 @@ import Header from '@/components/Header'
 import Hero from '@/components/Hero'
 import Locations from '@/components/Locations'
 import SocialLinks from '@/components/SocialLinks'
+import GalleryAdmin from './components/GalleryAdmin'
 import './styles.css'
 
 export default function App() {
@@ -10,6 +11,8 @@ export default function App() {
     <>
       <Header />
       <main>
+        <GalleryAdmin />
+
         <Hero />
         <Locations />
         <SocialLinks />

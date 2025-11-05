@@ -1,40 +1,83 @@
 import Section from '@/components/Section'
+import { useEffect } from 'react'
 
 export default function Hero() {
-  return (
-    <Section center variant="brand" id="inicio">
-      <div className="split">
-        {/* Texto (centrado) */}
-        <div data-reveal style={{ textAlign: 'center' }}>
-          <h1 className="h1">La excelencia en pastelería</h1>
+  useEffect(() => {
+    const els = document.querySelectorAll<HTMLElement>('[data-reveal]')
+    const reduce = window.matchMedia?.(
+      '(prefers-reduced-motion: reduce)',
+    ).matches
+    if (reduce || !('IntersectionObserver' in window)) {
+      els.forEach((el) => el.classList.add('reveal-in'))
+      return
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            ;(e.target as HTMLElement).classList.add('reveal-in')
+            io.unobserve(e.target)
+          }
+        })
+      },
+      { threshold: 0.2, rootMargin: '40px 0px -20px 0px' },
+    )
+    els.forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [])
 
-          <div
-            style={{
-              display: 'flex',
-              gap: 12,
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-            }}
-          >
-            <a className="btn" href="#sedes">
-              Ver sedes
-            </a>
-            <a className="btn secondary" href="#redes">
-              Síguenos
-            </a>
+  return (
+    <Section center variant="brand" id="inicio" aria-label="Portada pastelería">
+      {/* decor blobs */}
+      <span className="orb orb--1" aria-hidden="true" />
+      <span className="orb orb--2" aria-hidden="true" />
+      <span className="orb orb--3" aria-hidden="true" />
+
+      <div className="container hero-wrap">
+        <div className="split">
+          {/* Texto */}
+          <div data-reveal className="hero-copy">
+            <p className="eyebrow">Pastelería artesanal</p>
+            <h1 className="h1">La excelencia en pastelería</h1>
+            <p className="lead">
+              Tortas elegantes, frescas y con el toque perfecto para tus
+              momentos especiales.
+            </p>
+
+            <div
+              className="btn-group"
+              role="group"
+              aria-label="Acciones principales"
+            >
+              <a className="btn btn-lg" href="#sedes">
+                Ver sedes
+              </a>
+              <a className="btn secondary btn-lg" href="#redes">
+                Síguenos
+              </a>
+            </div>
+          </div>
+
+          {/* Imagen */}
+          <div data-reveal className="hero-media">
+            <picture>
+              <source srcSet="/hero-cake.png" type="image/webp" />
+              <img
+                src="/hero-cake.png"
+                width={520}
+                height={520}
+                decoding="async"
+                fetchPriority="high"
+                alt="Torta de cumpleaños con mariposas doradas"
+                className="hero-img floaty"
+              />
+            </picture>
           </div>
         </div>
-
-        {/* Imagen (derecha) */}
-        <div data-reveal style={{ justifySelf: 'end' }}>
-          {/* Guarda la imagen como /public/hero-cake.png */}
-          <img
-            src="/hero-cake.png"
-            alt="Torta de cumpleaños con mariposas doradas"
-            className="hero-img"
-          />
-        </div>
       </div>
+
+      {/* separador sutil entre secciones (opcional) */}
+      <div className="divider" aria-hidden="true" />
     </Section>
   )
 }

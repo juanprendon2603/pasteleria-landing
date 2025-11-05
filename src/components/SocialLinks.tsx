@@ -1,5 +1,7 @@
-// src/components/SocialLinks.tsx
+'use client'
+
 import Section from '@/components/Section'
+import { motion } from 'framer-motion'
 
 type Social = {
   id: 'instagram' | 'tiktok' | 'facebook'
@@ -31,22 +33,14 @@ const socials: Social[] = [
 
 // WhatsApp por sede
 const waMiranda =
-  'https://wa.me/573155287225?text=' +
-  encodeURIComponent('¡Hola! Quiero información de la sede Miranda 😊')
+  'https://wa.me/573155287225?text=' + encodeURIComponent('¡Hola!')
 const waFlorida =
-  'https://wa.me/573103585608?text=' +
-  encodeURIComponent('¡Hola! Quiero información de la sede Florida 😊')
+  'https://wa.me/573150815246?text=' + encodeURIComponent('¡Hola!')
 
-// Íconos SVG minimal (sin dependencias)
+// Íconos SVG minimal
 const Icon = {
   ig: () => (
-    <svg
-      width="28"
-      height="28"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
       <rect
         x="3"
         y="3"
@@ -61,13 +55,7 @@ const Icon = {
     </svg>
   ),
   tt: () => (
-    <svg
-      width="28"
-      height="28"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
       <path
         d="M14 3v6.5a4.5 4.5 0 1 1-4.5-4.5"
         stroke="currentColor"
@@ -83,13 +71,7 @@ const Icon = {
     </svg>
   ),
   fb: () => (
-    <svg
-      width="28"
-      height="28"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
       <path
         d="M14 9h3V6h-3a3 3 0 0 0-3 3v3H8v3h3v6h3v-6h3l1-3h-4V9a1 1 0 0 1 1-1z"
         fill="currentColor"
@@ -97,13 +79,7 @@ const Icon = {
     </svg>
   ),
   wa: () => (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 32 32"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
       <path
         d="M16 3C9.37 3 4 8.37 4 15c0 2.1.54 4.1 1.49 5.83L4 29l8.4-1.46A11.9 11.9 0 0 0 16 27c6.63 0 12-5.37 12-12S22.63 3 16 3z"
         fill="currentColor"
@@ -116,30 +92,79 @@ const Icon = {
   ),
 }
 
+// Animaciones suaves
+const container = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
+}
+const item = {
+  hidden: { opacity: 0, y: 10, scale: 0.97 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4 } },
+}
+
 export default function SocialLinks() {
   return (
-    <Section id="redes">
-      <header data-reveal style={{ textAlign: 'center' }}>
+    <Section
+      id="redes"
+      variant="surface"
+      center
+      style={{
+        background:
+          'linear-gradient(180deg,#fff7fe 0%,#f9faff 40%,#fff1f7 100%)',
+      }}
+    >
+      <header data-reveal style={{ textAlign: 'center', marginBottom: 24 }}>
         <h2 id="redes-title" className="h2">
           Síguenos y antójate
         </h2>
         <p className="lead">
-          Promos, nuevos sabores y el detrás de cámaras de nuestras creaciones.
+          Promos, nuevos sabores y un vistazo al detrás de nuestras creaciones.
         </p>
       </header>
 
-      {/* Redes centradas */}
-      <div className="social-center" data-reveal>
+      {/* Redes Sociales */}
+      <motion.div
+        className="social-center"
+        variants={container}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, amount: 0.2 }}
+      >
         {socials.map((s) => (
-          <a
+          <motion.a
             key={s.id}
             href={s.href}
             target="_blank"
             rel="noreferrer"
             className={`social-card ${s.id}`}
-            aria-label={s.label}
+            variants={item}
+            whileHover={{
+              y: -4,
+              boxShadow: '0 10px 24px rgba(183,108,253,0.25)',
+              scale: 1.03,
+            }}
+            style={{
+              borderRadius: 18,
+              background: '#fff',
+              border: '1px solid #eadfff',
+              padding: '16px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              transition: 'all 0.2s ease',
+            }}
           >
-            <span className="icon">
+            <span
+              className="icon"
+              style={{
+                color:
+                  s.id === 'instagram'
+                    ? '#E4405F'
+                    : s.id === 'facebook'
+                      ? '#1877F2'
+                      : '#000',
+              }}
+            >
               {s.id === 'instagram' ? (
                 <Icon.ig />
               ) : s.id === 'tiktok' ? (
@@ -148,23 +173,65 @@ export default function SocialLinks() {
                 <Icon.fb />
               )}
             </span>
-            <div className="text">
-              <strong>{s.label}</strong>
-              <span className="handle">{s.handle}</span>
+            <div className="text" style={{ textAlign: 'left' }}>
+              <strong style={{ fontSize: '16px', display: 'block' }}>
+                {s.label}
+              </strong>
+              <span className="handle" style={{ color: '#857b9a' }}>
+                {s.handle}
+              </span>
             </div>
-          </a>
+          </motion.a>
         ))}
-      </div>
+      </motion.div>
 
-      {/* WhatsApp por sede (centrado) */}
-      <div className="wa-wrap" data-reveal>
-        <a className="wa-btn" href={waMiranda} target="_blank" rel="noreferrer">
-          <Icon.wa /> WhatsApp Sede Miranda
-        </a>
-        <a className="wa-btn" href={waFlorida} target="_blank" rel="noreferrer">
-          <Icon.wa /> WhatsApp Sede Florida
-        </a>
-      </div>
+      {/* WhatsApp modernizado */}
+      <motion.div
+        className="wa-wrap"
+        variants={container}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true }}
+        style={{
+          marginTop: 36,
+          gap: 16,
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+        }}
+      >
+        {[
+          { href: waMiranda, label: 'Sede Miranda' },
+          { href: waFlorida, label: 'Sede Florida' },
+        ].map((w, i) => (
+          <motion.a
+            key={i}
+            href={w.href}
+            target="_blank"
+            rel="noreferrer"
+            variants={item}
+            whileHover={{
+              scale: 1.05,
+              boxShadow: '0 8px 20px rgba(37,211,102,0.25)',
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'linear-gradient(90deg,#25D366,#128C7E)',
+              color: '#fff',
+              borderRadius: 999,
+              padding: '12px 20px',
+              fontWeight: 700,
+              boxShadow: '0 6px 14px rgba(37,211,102,0.3)',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <Icon.wa />
+            WhatsApp {w.label}
+          </motion.a>
+        ))}
+      </motion.div>
     </Section>
   )
 }

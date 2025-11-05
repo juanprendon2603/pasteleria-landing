@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react'
 
 type Props = {
   id?: string
-  variant?: 'default' | 'alt' | 'brand'
+  variant?: 'default' | 'alt' | 'brand' | 'surface' // 👈 agrega 'surface'
   center?: boolean
   children: React.ReactNode
+  className?: string
+  style?: React.CSSProperties // ✅ para poder usar style inline
 }
 
 export default function Section({
@@ -12,6 +14,8 @@ export default function Section({
   variant = 'default',
   center,
   children,
+  className,
+  style,
 }: Props) {
   const ref = useRef<HTMLElement | null>(null)
 
@@ -35,10 +39,14 @@ export default function Section({
     <section
       id={id}
       ref={ref}
-      className={`section ${variant} ${center ? 'center' : ''}`}
+      className={`section ${variant} ${center ? 'center' : ''} ${
+        className ?? ''
+      }`}
       aria-labelledby={id ? `${id}-title` : undefined}
+      style={style} // ✅ esto soluciona el error
     >
       <div className="container">{children}</div>
+
       {/* decor separador ondulado */}
       <div className="divider" aria-hidden="true" />
     </section>

@@ -1,12 +1,26 @@
-// src/components/Header.tsx
+'use client'
+
+import { useEffect } from 'react'
+
 export default function Header() {
+  useEffect(() => {
+    // Añade/quita la clase "scrolled" al hacer scroll (opcional)
+    const header = document.querySelector<HTMLElement>('.header')
+    const onScroll = () => {
+      if (!header) return
+      header.classList.toggle('scrolled', window.scrollY > 40)
+    }
+    window.addEventListener('scroll', onScroll)
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   return (
     <header className="header">
       <nav className="container nav">
         <div className="brand">
-          {/* Logo */}
           <img
-            src="/logo.png" // ← pon aquí tu logo (por ejemplo /public/logo2.png)
+            src="/logo.png"
             alt="Logo Pastelería Nancy"
             className="brand-logo"
           />

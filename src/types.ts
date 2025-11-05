@@ -11,4 +11,8 @@ export type Branch = {
   openingHours?: string
   latitude?: number
   longitude?: number
+  /** redes sociales opcionales */
+  instagram?: string
+  facebook?: string
+  website?: string
 }
