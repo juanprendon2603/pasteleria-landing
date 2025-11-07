@@ -1,6 +1,8 @@
 // src/components/GallerySection.tsx
 'use client'
 
+import { db } from '@/firebase/config'
+import { collection, getDocs } from 'firebase/firestore'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -8,10 +10,10 @@ export type PhotoItem = {
   id: string
   title?: string
   imageUrl: string
+  publicId?: string
   category: string
   tags: string[]
   createdAt?: string | number
-  // opcionales para detalle
   description?: string
   author?: string
 }
@@ -19,16 +21,11 @@ export type PhotoItem = {
 type Props = {
   id?: string
   title?: string
-  /** Datos ya normalizados desde tu API */
-  items: PhotoItem[]
-  /** Listado de categorías posibles (para filtros) */
-  categories: string[]
-  /** Listado de etiquetas posibles (para filtros) */
-  tags: string[]
   /** Page size para "Cargar más" */
   pageSize?: number
 }
 
+/** Debounce mini hook */
 const useDebouncedValue = <T,>(value: T, delay = 350) => {
   const [v, setV] = useState(value)
   useEffect(() => {
@@ -41,11 +38,16 @@ const useDebouncedValue = <T,>(value: T, delay = 350) => {
 export default function GallerySection({
   id = 'galeria',
   title = 'Galería de pedidos',
-  items,
-  categories,
-  tags,
   pageSize = 12,
 }: Props) {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [items, setItems] = useState<PhotoItem[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [allTags, setAllTags] = useState<string[]>([])
+
+  // Filtros UI
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<string>('todas')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
@@ -53,33 +55,131 @@ export default function GallerySection({
     'reciente',
   )
   const [visible, setVisible] = useState(pageSize)
-
   const debouncedQuery = useDebouncedValue(query, 300)
+
+  // Cargar Firestore (categories + gallery)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Categorías
+        const cSnap = await getDocs(collection(db, 'categories'))
+        const cList = cSnap.docs
+          .map((d) => (d.data() as any)?.name)
+          .filter(Boolean) as string[]
+        setCategories(cList)
+
+        // Gallery
+        const gSnap = await getDocs(collection(db, 'gallery'))
+        const list: PhotoItem[] = gSnap.docs.map((d) => {
+          const data = d.data() as any
+          // createdAt puede ser Timestamp o undefined
+          const created =
+            (data?.createdAt?.toMillis && data.createdAt.toMillis()) ||
+            (typeof data?.createdAt === 'number' && data.createdAt) ||
+            (typeof data?.createdAt === 'string' &&
+              Date.parse(data.createdAt)) ||
+            0
+
+          return {
+            id: d.id,
+            title: data?.title || '',
+            imageUrl: data?.imageUrl,
+            publicId: data?.publicId,
+            category: data?.category || '',
+            tags: Array.isArray(data?.tags) ? data.tags : [],
+            createdAt: created,
+            description: data?.description,
+            author: data?.author,
+          }
+        })
+
+        setItems(list)
+
+        // Tags únicas
+        const tagSet = new Set<string>()
+        list.forEach((it) =>
+          it.tags?.forEach?.((t: string) => t && tagSet.add(t)),
+        )
+        setAllTags(Array.from(tagSet).sort((a, b) => a.localeCompare(b)))
+      } catch (e: any) {
+        console.error(e)
+        setError('No se pudieron cargar los datos')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  // transformar URL con Cloudinary (optimizado)
+  // Reemplaza tu clTransform por esto:
+  // 👇 reemplaza tu clTransform por este:
+  const clTransform = (url: string, publicId?: string) => {
+    // 1) intenta leer el cloudName desde env
+    let cloud = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined
+
+    // 2) si no viene por env, intenta deducirlo desde imageUrl (docs viejos/bulk)
+    if (!cloud && url) {
+      // coincide: https://res.cloudinary.com/<cloud>/image/upload/...
+      const m = url.match(/res\.cloudinary\.com\/([^/]+)\/image\/upload\//i)
+      if (m?.[1]) cloud = m[1]
+    }
+
+    // 3) si tenemos publicId y cloud, construimos URL canónica (forzando jpg)
+    if (cloud && publicId) {
+      return `https://res.cloudinary.com/${cloud}/image/upload/f_jpg,q_auto,w_900,c_limit/${publicId}.jpg`
+    }
+
+    // 4) si NO hay publicId pero sí url de upload, inyecta transform y cambia extensión a .jpg
+    if (url?.includes('/image/upload/')) {
+      const withTx = url.replace(
+        '/upload/',
+        '/upload/f_jpg,q_auto,w_900,c_limit/',
+      )
+      return withTx.replace(
+        /\.(heic|heif|png|jpeg|jpg|webp|avif)(\?|$)/i,
+        '.jpg$2',
+      )
+    }
+
+    // 5) último recurso: devuelve la original (no ideal, pero no rompe)
+    return url
+  }
+
+  // 👇 agrega temporalmente este log para confirmar la URL final (luego lo quitas)
+  useEffect(() => {
+    if (items.length) {
+      const first = items[0]
+      // imprime la URL que se usará realmente
+      console.log('CL test →', clTransform(first.imageUrl, first.publicId))
+    }
+  }, [items])
 
   // Filtro + búsqueda + orden
   const filtered = useMemo(() => {
     let list = items
 
-    // categoría
-    if (category !== 'todas') {
+    if (category !== 'todas')
       list = list.filter((it) => it.category === category)
-    }
-    // etiquetas (todas deben estar incluidas)
+
     if (selectedTags.length) {
       list = list.filter((it) => selectedTags.every((t) => it.tags.includes(t)))
     }
-    // búsqueda por título / tags
+
     const q = debouncedQuery.trim().toLowerCase()
     if (q) {
       list = list.filter((it) => {
         const hay =
           (it.title || '').toLowerCase().includes(q) ||
           it.tags.some((tg) => tg.toLowerCase().includes(q)) ||
-          it.category.toLowerCase().includes(q)
+          (it.category || '').toLowerCase().includes(q)
         return hay
       })
     }
-    // orden
+
     list = [...list].sort((a, b) => {
       if (sortBy === 'titulo') {
         return (a.title || '').localeCompare(b.title || '')
@@ -91,13 +191,12 @@ export default function GallerySection({
     return list
   }, [items, category, selectedTags, debouncedQuery, sortBy])
 
-  // reset “visible” al cambiar filtros/busqueda
+  // reset visible al cambiar filtros
   useEffect(
     () => setVisible(pageSize),
     [debouncedQuery, category, selectedTags, sortBy, pageSize],
   )
 
-  // toggle multitag
   const toggleTag = (t: string) =>
     setSelectedTags((prev) =>
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
@@ -136,7 +235,7 @@ export default function GallerySection({
         <header className="gal-header" data-reveal>
           <div>
             <h2 id={`${id}-title`} className="h2">
-              Explora nuestros pedidos
+              {title}
             </h2>
             <p className="lead">
               Filtra por categoría, etiquetas o busca por nombre/sabor/tema.
@@ -186,14 +285,14 @@ export default function GallerySection({
           </div>
 
           {/* Etiquetas (chips) */}
-          {tags.length > 0 && (
+          {allTags.length > 0 && (
             <div
               className="chips"
               data-reveal
               role="group"
               aria-label="Filtrar por etiquetas"
             >
-              {tags.map((t) => {
+              {allTags.map((t) => {
                 const active = selectedTags.includes(t)
                 return (
                   <button
@@ -218,54 +317,70 @@ export default function GallerySection({
           )}
         </header>
 
-        {/* Grid */}
-        <AnimatePresence mode="popLayout">
-          <div className="gallery-grid" data-reveal>
-            {toShow.map((p) => (
-              <motion.figure
-                key={p.id}
-                className="photo-tile"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.28 }}
-              >
-                <div className="thumb-wrap" aria-hidden="true">
-                  <img
-                    src={p.imageUrl}
-                    alt={p.title || 'Pedido'}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </div>
-                <figcaption className="tile-caption">
-                  <div className="tile-title">{p.title || 'Pedido'}</div>
-                  <div className="tile-meta">
-                    <span className="badge">{p.category}</span>
-                    {p.tags.slice(0, 2).map((tg) => (
-                      <span key={tg} className="tag">
-                        {tg}
-                      </span>
-                    ))}
-                  </div>
-                </figcaption>
-              </motion.figure>
-            ))}
-
-            {/* Vacío */}
-            {toShow.length === 0 && (
-              <div className="empty">
-                <p>
-                  No encontramos resultados. Prueba otra búsqueda o quita
-                  filtros.
-                </p>
-              </div>
-            )}
+        {/* Loading / Error */}
+        {loading && (
+          <div className="empty" data-reveal>
+            <p>Cargando galería…</p>
           </div>
-        </AnimatePresence>
+        )}
+        {error && !loading && (
+          <div className="empty" data-reveal>
+            <p>{error}</p>
+          </div>
+        )}
+
+        {/* Grid */}
+        {!loading && !error && (
+          <AnimatePresence mode="popLayout">
+            <div className="gallery-grid">
+              {toShow.map((p) => (
+                <motion.figure
+                  key={p.id}
+                  className="photo-tile"
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.28 }}
+                >
+                  <div className="thumb-wrap" aria-hidden="true">
+                    <img
+                      src={clTransform(p.imageUrl, p.publicId)}
+                      alt={p.title || 'Pedido'}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                  <figcaption className="tile-caption">
+                    <div className="tile-title">{p.title || 'Pedido'}</div>
+                    <div className="tile-meta">
+                      <span className="badge">
+                        {p.category || 'Sin categoría'}
+                      </span>
+                      {p.tags?.slice?.(0, 2).map((tg) => (
+                        <span key={tg} className="tag">
+                          {tg}
+                        </span>
+                      ))}
+                    </div>
+                  </figcaption>
+                </motion.figure>
+              ))}
+
+              {/* Vacío */}
+              {toShow.length === 0 && (
+                <div className="empty">
+                  <p>
+                    No encontramos resultados. Prueba otra búsqueda o quita
+                    filtros.
+                  </p>
+                </div>
+              )}
+            </div>
+          </AnimatePresence>
+        )}
 
         {/* Cargar más */}
-        {hasMore && (
+        {!loading && !error && hasMore && (
           <div className="load-wrap">
             <button
               className="btn"
