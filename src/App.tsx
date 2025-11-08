@@ -3,8 +3,10 @@ import Header from '@/components/Header'
 import Hero from '@/components/Hero'
 import Locations from '@/components/Locations'
 import SocialLinks from '@/components/SocialLinks'
+import WorksPreview from '@/components/WorksPreview'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
+import PublicGalleryPage from './pages/PublicGalleryPage'
 
 // Home “pública”
 function Home() {
@@ -13,6 +15,7 @@ function Home() {
       <Header />
       <main>
         <Hero />
+        <WorksPreview /> {/* 👈 nueva sección */}
         <Locations />
         <SocialLinks />
       </main>
@@ -25,8 +28,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
+      <Route path="/galeria" element={<PublicGalleryPage />} />{' '}
+      {/* 👈 nueva ruta */}
       <Route path="/dashboard" element={<Dashboard />} />
-      {/* opcional: redirect desconocidos a home */}
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   )

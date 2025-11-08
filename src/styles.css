@@ -417,3 +417,92 @@ footer p{color:var(--muted);text-align:center;margin:0;padding:24px}
 }
 
 
+/* Quita la segunda fila (caption) del tile solo en el preview */
+#trabajos .photo-tile.photo-tile--plain{
+  grid-template-rows: auto;   /* en tu .photo-tile venía "auto minmax(...)" */
+  border-radius: 16px;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Marco uniforme, sin recorte (letterbox) */
+#trabajos .thumb-wrap.thumb-wrap--frame{
+  /* alto fijo responsivo */
+  height: clamp(220px, 26vw, 320px);
+  width: 100%;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #faf7ff, #f7fffe); /* suave, opcional */
+  display: flex;               /* centramos la imagen */
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;            /* sin desbordes raros */
+}
+
+/* La imagen respeta su proporción y nunca recorta */
+#trabajos .thumb-wrap.thumb-wrap--frame img{
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;        /* clave para no estirar */
+  height: auto;       /* clave para no recortar */
+  object-fit: contain;
+  transition: transform .25s ease;
+}
+
+/* Hover sutil (opcional) */
+#trabajos .photo-tile.photo-tile--plain:hover img{
+  transform: scale(1.01);
+}
+
+
+/* ===== Overrides para grid tipo "carrusel": imagen sola y meta abajo ===== */
+
+/* Anula el cuadrado forzado del grid normal */
+.photo-tile.photo-tile--plain .thumb-wrap {
+  aspect-ratio: auto !important;
+  height: auto !important;
+}
+
+/* Marco que respeta proporciones (igual al carrusel) */
+.photo-tile.photo-tile--plain .thumb-wrap--frame {
+  max-height: 420px;                  /* desktop */
+  background: linear-gradient(180deg,#faf7ff,#f7fffe);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-bottom: 1px solid var(--ring);
+}
+@media (max-width: 900px){
+  .photo-tile.photo-tile--plain .thumb-wrap--frame { max-height: 360px; }
+}
+@media (max-width: 560px){
+  .photo-tile.photo-tile--plain .thumb-wrap--frame { max-height: 300px; }
+}
+
+/* La imagen mantiene su tamaño/proporción, sin recortes */
+.photo-tile.photo-tile--plain .thumb-wrap--frame img {
+  height: 100%;
+  width: auto;                /* importante: no forces width 100% */
+  max-width: min(100%, 1000px);
+  object-fit: contain;        /* sin recortes */
+  display: block;
+  transition: transform .25s ease, filter .25s ease;
+}
+.photo-tile.photo-tile--plain:hover .thumb-wrap--frame img {
+  transform: scale(1.015);
+  filter: contrast(1.02);
+}
+
+/* Asegura que los metadatos estén FUERA de la imagen (no superpuestos) */
+.photo-tile.photo-tile--plain .tile-caption {
+  position: static !important;
+  padding: 10px 12px 12px;
+  background: #fff;
+}
+.photo-tile.photo-tile--plain .tile-title { margin: 8px 0 6px; }
+
+/* Opcional: si algún estilo anterior agrega sombras/overlay a la imagen, límpialo */
+.photo-tile.photo-tile--plain .thumb-wrap::before,
+.photo-tile.photo-tile--plain .thumb-wrap::after {
+  content: none !important;
+}

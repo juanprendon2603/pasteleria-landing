@@ -252,6 +252,9 @@ export default function GalleryAdmin() {
         if (thisTitle)
           form.append('context', `caption=${thisTitle}|alt=${thisTitle}`)
 
+        // 👇 añade esto:
+        form.append('return_delete_token', '1')
+
         const res = await fetch(
           `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
           { method: 'POST', body: form },
@@ -263,11 +266,13 @@ export default function GalleryAdmin() {
         const data = await res.json()
         const imageUrl = data.secure_url as string
         const publicId = data.public_id as string
+        const deleteToken = data.delete_token as string | undefined // 👈
 
         await addDoc(collection(db, 'gallery'), {
           title: thisTitle,
           imageUrl,
           publicId,
+          deleteToken, // 👈 NUEVO
           category,
           tags: tagList,
           createdAt: serverTimestamp(),
@@ -324,6 +329,7 @@ export default function GalleryAdmin() {
               form.append('upload_preset', uploadPreset)
               // carpeta fija para masivos
               form.append('folder', `pasteleria/gallery/bulk`)
+              form.append('return_delete_token', '1')
 
               const res = await fetch(
                 `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
@@ -340,12 +346,14 @@ export default function GalleryAdmin() {
               const data = await res.json()
               const imageUrl = data.secure_url as string
               const publicId = data.public_id as string
+              const deleteToken = data.delete_token as string | undefined // 👈
 
               // Guardar con campos vacíos
               await addDoc(collection(db, 'gallery'), {
                 title: '',
                 imageUrl,
                 publicId,
+                deleteToken, // 👈 NUEVO
                 category: '',
                 tags: [],
                 createdAt: serverTimestamp(),
