@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "pasteleria-landing"
-  }
+    "default": "pasteleria-landing",
+    "landing": "pasteleria-landing"
+  },
+  "targets": {},
+  "etags": {}
 }

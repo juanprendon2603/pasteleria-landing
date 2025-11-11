@@ -167,11 +167,10 @@ export default function GallerySection({
   const [inquiryItem, setInquiryItem] = useState<PhotoItem | null>(null)
   const [inquiryImg, setInquiryImg] = useState<string>('')
 
-  // Modales admin
+  // Modales admin (sin título)
   const [editOpen, setEditOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [current, setCurrent] = useState<PhotoItem | null>(null)
-  const [editTitle, setEditTitle] = useState('')
   const [editCategory, setEditCategory] = useState('')
   const [editTags, setEditTags] = useState('')
 
@@ -233,18 +232,14 @@ export default function GallerySection({
     void load()
   }, [])
 
-  // Filtro + búsqueda + orden
+  // Filtro + búsqueda + orden (SIN título)
   const filtered = useMemo(() => {
     let list = items
     if (category !== 'todas') list = list.filter((it) => it.category === category)
     if (selectedTags.length) list = list.filter((it) => selectedTags.every((t) => it.tags.includes(t)))
     const q = debouncedQuery.trim().toLowerCase()
     if (q) {
-      list = list.filter((it) => {
-        const inTitle = (it.title || '').toLowerCase().includes(q)
-        const inTags = it.tags.some((tg) => tg.toLowerCase().includes(q))
-        return inTitle || inTags
-      })
+      list = list.filter((it) => it.tags.some((tg) => tg.toLowerCase().includes(q)))
     }
     list = [...list].sort((a, b) => {
       if (sortBy === 'titulo') return (a.title || '').localeCompare(b.title || '')
@@ -267,7 +262,6 @@ export default function GallerySection({
   // ======= Admin actions =======
   const openEdit = (item: PhotoItem) => {
     setCurrent(item)
-    setEditTitle(item.title || '')
     setEditCategory(item.category || '')
     setEditTags(item.tags.join(', '))
     setEditOpen(true)
@@ -277,9 +271,11 @@ export default function GallerySection({
     if (!current) return
     const ref = doc(db, 'gallery', current.id)
     const newTags = editTags.split(',').map((t) => t.trim()).filter(Boolean)
-    await updateDoc(ref, { title: editTitle, category: editCategory, tags: newTags })
+    await updateDoc(ref, { category: editCategory, tags: newTags }) // ← sin título
     setItems((prev) =>
-      prev.map((it) => (it.id === current.id ? { ...it, title: editTitle, category: editCategory, tags: newTags } : it)),
+      prev.map((it) =>
+        it.id === current.id ? { ...it, category: editCategory, tags: newTags } : it,
+      ),
     )
     setEditOpen(false)
     setCurrent(null)
@@ -331,14 +327,14 @@ export default function GallerySection({
         <header className="gal-header">
           <div>
             <h2 id={`${id}-title`} className="h2">{title}</h2>
-            <p className="lead">Filtra por título, etiquetas u ordena por fecha/título.</p>
+            <p className="lead">Filtra por etiquetas u ordena por fecha.</p>
           </div>
 
           <div className="gal-controls">
             <div className="input-wrap">
               <input
                 type="search"
-                placeholder="Buscar por título o etiqueta…"
+                placeholder="Buscar por etiqueta…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 aria-label="Buscar en galer\u00eda"
@@ -352,6 +348,7 @@ export default function GallerySection({
                 aria-label="Filtrar por categor\u00eda"
               >
                 <option value="todas">Todas las categorías</option>
+                <option value="">(sin categoría)</option>
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
@@ -425,7 +422,7 @@ export default function GallerySection({
                       <span className={`ribbon ${catSlug || 'sin-cat'}`}>
                         <i aria-hidden>🏷️</i> {p.category || 'Sin categoría'}
                       </span>
-                      <img src={imgSmall} alt={p.title || 'Pedido'} loading="lazy" decoding="async" />
+                      <img src={imgSmall} alt="Pedido" loading="lazy" decoding="async" />
                     </div>
 
                     {/* Acciones debajo */}
@@ -512,10 +509,6 @@ export default function GallerySection({
         <Modal onClose={() => setEditOpen(false)} title="Editar imagen">
           <div className="grid cols-2">
             <div className="input-wrap">
-              <label>Título</label>
-              <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-            </div>
-            <div className="input-wrap">
               <label>Categoría</label>
               <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)}>
                 <option value="">(sin categoría)</option>
@@ -546,7 +539,7 @@ export default function GallerySection({
           <p>
             ¿Seguro que quieres eliminar esta imagen?
             <br />
-            <strong>{current.title || current.publicId}</strong>
+            <strong>{current.publicId}</strong>
           </p>
           <small className="muted">
             Se borrará el documento en Firestore y se intentará borrar el asset en Cloudinary (si hay <code>deleteToken</code> o endpoint backend).
