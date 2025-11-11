@@ -27,6 +27,7 @@ type Category = {
   id: string
   name: string
 }
+type CategoryDoc = { name?: string }
 
 type LocalFile = {
   file: File
@@ -59,7 +60,14 @@ export default function GalleryAdmin() {
   useEffect(() => {
     const fetchCategories = async () => {
       const snap = await getDocs(collection(db, 'categories'))
-      setCategories(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })))
+      const list: Category[] = snap.docs
+        .map((d) => {
+          const data = d.data() as CategoryDoc
+          const name = data?.name ?? ''
+          return name ? { id: d.id, name } : null
+        })
+        .filter((x): x is Category => x !== null)
+      setCategories(list)
     }
     fetchCategories()
   }, [])
@@ -215,7 +223,6 @@ export default function GalleryAdmin() {
     return () => window.removeEventListener('paste', onPaste)
   }, [])
 
-  const openFilePicker = () => inputRef.current?.click()
   const openBulkFilePicker = () => bulkInputRef.current?.click()
 
   // Subida normal (con título/categoría/tags)
@@ -251,8 +258,6 @@ export default function GalleryAdmin() {
         const thisTitle = baseTitle || original.name
         if (thisTitle)
           form.append('context', `caption=${thisTitle}|alt=${thisTitle}`)
-
-        // 👇 añade esto:
         form.append('return_delete_token', '1')
 
         const res = await fetch(
@@ -266,13 +271,13 @@ export default function GalleryAdmin() {
         const data = await res.json()
         const imageUrl = data.secure_url as string
         const publicId = data.public_id as string
-        const deleteToken = data.delete_token as string | undefined // 👈
+        const deleteToken = data.delete_token as string | undefined
 
         await addDoc(collection(db, 'gallery'), {
           title: thisTitle,
           imageUrl,
           publicId,
-          deleteToken, // 👈 NUEVO
+          deleteToken,
           category,
           tags: tagList,
           createdAt: serverTimestamp(),
@@ -296,7 +301,6 @@ export default function GalleryAdmin() {
   }
 
   // ====== SUBIDA MASIVA (sin título/categoría/tags) ======
-  // helper para procesar en bloques concurrentes
   const chunked = <T,>(arr: T[], size: number) =>
     Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
       arr.slice(i * size, i * size + size),
@@ -327,16 +331,12 @@ export default function GalleryAdmin() {
               const form = new FormData()
               form.append('file', toUpload)
               form.append('upload_preset', uploadPreset)
-              // carpeta fija para masivos
               form.append('folder', `pasteleria/gallery/bulk`)
               form.append('return_delete_token', '1')
 
               const res = await fetch(
                 `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-                {
-                  method: 'POST',
-                  body: form,
-                },
+                { method: 'POST', body: form },
               )
               if (!res.ok) {
                 console.error('Cloudinary error:', await res.text())
@@ -346,14 +346,13 @@ export default function GalleryAdmin() {
               const data = await res.json()
               const imageUrl = data.secure_url as string
               const publicId = data.public_id as string
-              const deleteToken = data.delete_token as string | undefined // 👈
+              const deleteToken = data.delete_token as string | undefined
 
-              // Guardar con campos vacíos
               await addDoc(collection(db, 'gallery'), {
                 title: '',
                 imageUrl,
                 publicId,
-                deleteToken, // 👈 NUEVO
+                deleteToken,
                 category: '',
                 tags: [],
                 createdAt: serverTimestamp(),

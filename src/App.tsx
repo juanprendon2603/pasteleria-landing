@@ -8,14 +8,13 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import PublicGalleryPage from './pages/PublicGalleryPage'
 
-// Home “pública”
 function Home() {
   return (
     <>
       <Header />
       <main>
         <Hero />
-        <WorksPreview /> {/* 👈 nueva sección */}
+        <WorksPreview /> 
         <Locations />
         <SocialLinks />
       </main>
@@ -29,7 +28,6 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/galeria" element={<PublicGalleryPage />} />{' '}
-      {/* 👈 nueva ruta */}
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

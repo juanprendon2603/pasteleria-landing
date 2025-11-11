@@ -15,8 +15,9 @@ export default function Hero() {
       (entries) => {
         entries.forEach((e) => {
           if (e.isIntersecting) {
-            ;(e.target as HTMLElement).classList.add('reveal-in')
-            io.unobserve(e.target)
+            const target = e.target as HTMLElement
+            target.classList.add('reveal-in')
+            io.unobserve(target)
           }
         })
       },
@@ -27,7 +28,13 @@ export default function Hero() {
   }, [])
 
   return (
-    <Section center variant="brand" id="inicio" aria-label="Portada pastelería">
+<Section
+  center
+  variant="brand"
+  id="inicio"
+  aria-label="Portada pastelería"
+  style={{ paddingTop: 0, marginTop: 0 }}
+>
       {/* decor blobs */}
       <span className="orb orb--1" aria-hidden="true" />
       <span className="orb orb--2" aria-hidden="true" />

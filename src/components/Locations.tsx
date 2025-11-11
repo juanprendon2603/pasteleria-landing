@@ -75,8 +75,9 @@ function useRevealFallback() {
       (entries) =>
         entries.forEach((e) => {
           if (e.isIntersecting) {
-            ;(e.target as HTMLElement).classList.add('reveal-in')
-            io.unobserve(e.target)
+            const target = e.target as HTMLElement
+            target.classList.add('reveal-in')
+            io.unobserve(target)
           }
         }),
       { threshold: 0.16, rootMargin: '40px 0px -20px 0px' },
@@ -90,10 +91,6 @@ function useRevealFallback() {
 const cardVariants = {
   hidden: { opacity: 0, y: 16, scale: 0.98 },
   show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.55 } },
-}
-const item = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 }
 
 // Card
@@ -109,7 +106,7 @@ function Banner({ b }: { b: Branch }) {
       viewport={{ once: true, amount: 0.2 }}
       aria-label={`Información de ${b.name}`}
     >
-      {/* --- Cabecera con imagen (solo título y dirección encima) --- */}
+      {/* Cabecera con imagen */}
       <div className="branch-head">
         <img
           src={b.image}
@@ -131,7 +128,7 @@ function Banner({ b }: { b: Branch }) {
         </div>
       </div>
 
-      {/* --- Cuerpo fuera de la imagen: horarios + botones --- */}
+      {/* Cuerpo: horarios + botones */}
       <div className="branch-body">
         <div
           className="hours-card hours-card--out"
