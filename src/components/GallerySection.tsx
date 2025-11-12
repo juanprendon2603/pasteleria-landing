@@ -101,6 +101,10 @@ export default function GallerySection({
   const [error, setError] = useState<string | null>(null)
   const [items, setItems] = useState<PhotoItem[]>([])
   const [categories, setCategories] = useState<string[]>([])
+  // --- NUEVO: estado específico para el editor de etiquetas ---
+const [editTagList, setEditTagList] = useState<string[]>([])
+const [tagInput, setTagInput] = useState('')
+
 
   // Catálogo de etiquetas unificadas
   const [tagCatalog, setTagCatalog] = useState<UiTag[]>([])
@@ -268,32 +272,74 @@ export default function GallerySection({
     })
   }
 
+  // --- NUEVO: helpers editor de tags ---
+const addTag = (raw: string) => {
+  const label = prettyTag(raw)
+  const exists = editTagList.some((t) => normalizeTag(t) === normalizeTag(label))
+  if (!exists) setEditTagList((prev) => [...prev, label])
+  setTagInput('')
+}
+
+const removeTag = (norm: string) => {
+  setEditTagList((prev) => prev.filter((t) => normalizeTag(t) !== norm))
+}
+
+const onTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === 'Enter' || e.key === ',' ) {
+    e.preventDefault()
+    const val = tagInput.trim().replace(/,$/, '')
+    if (val) addTag(val)
+  } else if (e.key === 'Backspace' && !tagInput) {
+    // UX: borrar el último chip si el input está vacío
+    setEditTagList((prev) => prev.slice(0, -1))
+  }
+}
+
+// Sugerencias filtradas desde el catálogo
+const tagSuggestions = useMemo(() => {
+  const q = normalizeTag(tagInput)
+  const base = tagCatalog
+  if (!q) return base.slice(0, 10) // top 10 por uso
+  return base.filter(t => normalizeTag(t.label).includes(q)).slice(0, 10)
+}, [tagInput, tagCatalog])
+
+
   const hasMore = visible < filtered.length
   const toShow = filtered.slice(0, visible)
 
   /** Admin: abrir/guardar/eliminar */
-  const openEdit = (item: PhotoItem) => {
-    setCurrent(item)
-    setEditCategory(item.category || '')
-    setEditTags(item.tags.join(', '))
-    setEditOpen(true)
-  }
+const openEdit = (item: PhotoItem) => {
+  setCurrent(item)
+  setEditCategory(item.category || '')
+  setEditTags(item.tags.join(', ')) // (lo mantengo por compatibilidad si lo usas en otro lado)
+  setEditTagList(item.tags ?? [])
+  setTagInput('')
+  setEditOpen(true)
+}
 
-  const saveEdit = async () => {
-    if (!current) return
-    const ref = doc(db, 'gallery', current.id)
-    const newTags = editTags.split(',').map((t) => t.trim()).filter(Boolean)
-    await updateDoc(ref, { category: editCategory, tags: newTags })
-    setItems((prev) =>
-      prev.map((it) =>
-        it.id === current.id
-          ? { ...it, category: editCategory, tags: newTags, tagsNorm: newTags.map(normalizeTag) }
-          : it,
-      ),
-    )
-    setEditOpen(false)
-    setCurrent(null)
-  }
+
+const saveEdit = async () => {
+  if (!current) return
+  const ref = doc(db, 'gallery', current.id)
+
+  // Fuente de la verdad: editTagList
+  const newTags = editTagList
+    .map((t) => t.trim())
+    .filter(Boolean)
+
+  await updateDoc(ref, { category: editCategory, tags: newTags })
+
+  setItems((prev) =>
+    prev.map((it) =>
+      it.id === current.id
+        ? { ...it, category: editCategory, tags: newTags, tagsNorm: newTags.map(normalizeTag) }
+        : it,
+    ),
+  )
+  setEditOpen(false)
+  setCurrent(null)
+}
+
 
   const openConfirmDelete = (item: PhotoItem) => {
     setCurrent(item)
@@ -538,15 +584,72 @@ export default function GallerySection({
             </div>
           </div>
 
-          <div className="input-wrap">
-            <label>Etiquetas (coma separadas)</label>
-            <input
-              type="text"
-              value={editTags}
-              onChange={(e) => setEditTags(e.target.value)}
-              placeholder="chocolate, fondant, baby shower"
-            />
-          </div>
+       {/* --- NUEVO: Editor de etiquetas con chips + sugerencias --- */}
+<div className="input-wrap">
+  <label>Etiquetas</label>
+
+  {/* Chips ya seleccionados */}
+  <div className="chips" style={{ gap: 8, marginBottom: 8 }}>
+    {editTagList.map((t) => {
+      const norm = normalizeTag(t)
+      return (
+        <button
+          key={norm}
+          type="button"
+          className="chip active"
+          aria-pressed="true"
+          onClick={() => removeTag(norm)}
+          title="Quitar etiqueta"
+        >
+          {prettyTag(t)} ✕
+        </button>
+      )
+    })}
+    {editTagList.length === 0 && <span className="muted">Sin etiquetas</span>}
+  </div>
+
+  {/* Input con enter/coma para añadir */}
+  <input
+    type="text"
+    value={tagInput}
+    onChange={(e) => setTagInput(e.target.value)}
+    onKeyDown={onTagInputKeyDown}
+    placeholder="Escribe y presiona Enter (p. ej. chocolate, fondant, baby shower)"
+    aria-label="Añadir etiqueta"
+  />
+
+  {/* Sugerencias en vivo (catálogo/top) */}
+  {tagSuggestions.length > 0 && (
+    <div className="chips" style={{ gap: 8, marginTop: 8 }}>
+      {tagSuggestions.map(({ norm, label, count }) => {
+        const active = editTagList.some((t) => normalizeTag(t) === norm)
+        return (
+          <button
+            key={norm}
+            type="button"
+            className={`chip ${active ? 'active' : ''}`}
+            onClick={() => (active ? removeTag(norm) : addTag(label))}
+            title={`${count} coincidencia${count === 1 ? '' : 's'}`}
+          >
+            {label}{!active && ' +'}
+          </button>
+        )
+      })}
+      {/* Atajo para limpiar todas */}
+      {editTagList.length > 0 && (
+        <button
+          type="button"
+          className="chip clear"
+          onClick={() => setEditTagList([])}
+          title="Limpiar todo"
+        >
+          Limpiar
+        </button>
+      )}
+    </div>
+  )}
+</div>
+
 
           <div className="modal-actions">
             <button className="btn" onClick={saveEdit} type="button">Guardar cambios</button>
@@ -620,6 +723,11 @@ export default function GallerySection({
         .chip.clear{ background:#fff; color:#5b21b6; border:1px dashed #c4b5fd; }
 
         .empty { display:grid; place-items:center; min-height: 120px; }
+        /* chips ya existen en tu header; esto asegura estados */
+.chip { padding: 6px 10px; border-radius: 999px; border:1px solid #ddd; background:#f8f8ff; cursor:pointer; }
+.chip.active { background:#5b21b6; color:#fff; border-color:#5b21b6; }
+.chip.clear { background:#fff; color:#5b21b6; border:1px dashed #c4b5fd; }
+
       `}</style>
     </section>
   )
