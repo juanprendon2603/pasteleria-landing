@@ -41,7 +41,7 @@ const branches: Branch[] = [
     name: 'Sede Florida',
     phone: '+57 315 0815246',
     whatsapp: '573150815246',
-    address: 'Calle 6 con Carrera 15, Esquina',
+    address: 'Calle 6 # 14-40',
     mapsUrl:
       'https://www.google.com/maps/dir/?api=1&destination=Calle+6+con+Carrera+15,+Florida,+Valle+del+Cauca',
     openingHours: 'Lun–Sáb 8:00–18:00 · Dom 8:30–14:00 · Festivos 8:30–13:00',

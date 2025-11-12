@@ -18,16 +18,21 @@ export default function Header() {
   return (
     <header className="header">
       <nav className="container nav">
-        <div className="brand">
+        {/* Marca */}
+        <a href="/" className="brand" aria-label="Ir al inicio">
           <img
             src="/logo.png"
             alt="Logo Pastelería Nancy"
             className="brand-logo"
           />
           <span className="brand-text">Pastelería Nancy</span>
-        </div>
+        </a>
 
+        {/* Acciones */}
         <div className="actions">
+          <a className="btn secondary" href="/galeria">
+            Galería
+          </a>
           <a className="btn secondary" href="#sedes">
             Sedes
           </a>

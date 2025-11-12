@@ -1,17 +1,14 @@
-// src/components/GallerySection.tsx
 'use client'
 
 import { db } from '@/firebase/config'
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  updateDoc,
-} from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDocs, updateDoc } from 'firebase/firestore'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
+import Modal from '@/components/Modal'
+import ViewerOverlay from '@/components/ViewerOverlay'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { clLarge, clTransform, toShareUrl } from '@/utils/cloudinary'
 
 export type PhotoItem = {
   id: string
@@ -20,29 +17,23 @@ export type PhotoItem = {
   publicId?: string
   category: string
   tags: string[]
+  tagsNorm?: string[]
   createdAt?: string | number
   description?: string
   author?: string
   deleteToken?: string
 }
 
-export type Branch = {
-  id: string
-  name: string
-  phone: string
-}
+export type Branch = { id: string; name: string; phone: string }
 
 type Props = {
   id?: string
   title?: string
   pageSize?: number
-  /** Fuerza modo admin. Si no se pasa, se infiere desde la URL (/dashboard) */
   admin?: boolean
-  /** Sedes opcionales para WhatsApp */
   branches?: Branch[]
 }
 
-/** Docs de Firestore tipados */
 type CategoryDoc = { name?: string }
 type FirestoreGalleryData = {
   title?: string
@@ -56,17 +47,6 @@ type FirestoreGalleryData = {
   author?: string
 }
 
-/** Debounce mini hook */
-const useDebouncedValue = <T,>(value: T, delay = 350) => {
-  const [v, setV] = useState(value)
-  useEffect(() => {
-    const t = setTimeout(() => setV(value), delay)
-    return () => clearTimeout(t)
-  }, [value, delay])
-  return v
-}
-
-/** Slug para clases */
 const slugify = (s?: string) =>
   (s || 'sin-cat')
     .toLowerCase()
@@ -74,56 +54,25 @@ const slugify = (s?: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
 
-/** URL compartible que NO fuerza descarga (limpia fl_attachment y query) */
-const toShareUrl = (url: string, publicId?: string, w = 1200) => {
-  let cloud = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined
-  if (!cloud && url) {
-    const m = url.match(/res\.cloudinary\.com\/([^/]+)\/image\/upload\//i)
-    if (m?.[1]) cloud = m[1]
-  }
-  const base = cloud ? `https://res.cloudinary.com/${cloud}/image/upload` : ''
-  const common = `f_auto,q_auto,dpr_auto,c_limit,w_${w}`
-  if (cloud && publicId) return `${base}/${common}/${publicId}`
+const normalizeTag = (s: string) =>
+  s.trim().replace(/[.]+$/g, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
-  const cleanNoQS = url.split('?')[0]
-  const cleaned = cleanNoQS
-    .replace(/\/upload\/([^/]*,)?fl_attachment[^/]*\//i, '/upload/')
-    .replace(/\/upload\/([^/]*,)?attachment[^/]*\//i, '/upload/')
-  if (cleaned.includes('/image/upload/')) {
-    return cleaned.replace('/upload/', `/upload/${common}/`)
-  }
-  return cleaned
+const prettyTag = (s: string) => {
+  const t = s.trim().replace(/[.]+$/g, '')
+  return t.charAt(0).toUpperCase() + t.slice(1)
 }
 
-/** Cloudinary transform (limitando ALTURA, sin recortar) */
-const clTransform = (url: string, publicId?: string, h = 420) => {
-  let cloud = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined
-  if (!cloud && url) {
-    const m = url.match(/res\.cloudinary\.com\/([^/]+)\/image\/upload\//i)
-    if (m?.[1]) cloud = m[1]
-  }
-  if (cloud && publicId) {
-    return `https://res.cloudinary.com/${cloud}/image/upload/f_auto,q_auto,h_${h},c_limit/${publicId}`
-  }
-  if (url?.includes('/image/upload/')) {
-    return url.replace('/upload/', `/upload/f_auto,q_auto,h_${h},c_limit/`)
-  }
-  return url
-}
+type UiTag = { norm: string; label: string; count: number }
 
-/** Versión grande (para viewer) */
-const clLarge = (url: string, publicId?: string) => clTransform(url, publicId, 1600)
+type SortBy = 'reciente' | 'antiguo' | 'titulo'
 
-/** WhatsApp con mensaje simple + link inline */
+
 const buildWA = (phone: string, item: PhotoItem, imgUrl: string) => {
   const share = toShareUrl(imgUrl, item.publicId)
   const base = `https://wa.me/${phone}`
   const msg = `Hola, deseo más info de esta torta:\n${share}`
   return `${base}?text=${encodeURIComponent(msg)}`
 }
-
-const SORT_VALUES = ['reciente', 'antiguo', 'titulo'] as const
-type SortBy = typeof SORT_VALUES[number]
 
 export default function GallerySection({
   id = 'galeria',
@@ -132,49 +81,63 @@ export default function GallerySection({
   admin,
   branches,
 }: Props) {
+  /** Router: admin y sincronización URL */
   const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const isAdmin = useMemo(
     () => (typeof admin === 'boolean' ? admin : location.pathname.startsWith('/dashboard')),
     [admin, location.pathname],
   )
 
-  // Sedes por defecto
+  // Sedes
   const fallbackBranches: Branch[] = [
     { id: 'mir', name: 'Sede Miranda', phone: '573155287225' },
     { id: 'flo', name: 'Sede Florida',  phone: '573150815246' },
   ]
   const sedeList = branches?.length ? branches : fallbackBranches
 
+  // Estado principal
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
   const [items, setItems] = useState<PhotoItem[]>([])
   const [categories, setCategories] = useState<string[]>([])
-  const [allTags, setAllTags] = useState<string[]>([])
 
-  // Filtros UI
+  // Catálogo de etiquetas unificadas
+  const [tagCatalog, setTagCatalog] = useState<UiTag[]>([])
+  const [showAllTags, setShowAllTags] = useState(false)
+
+  // Filtros
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<string>('todas')
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>([]) // norms
   const [sortBy, setSortBy] = useState<SortBy>('reciente')
   const [visible, setVisible] = useState(pageSize)
   const debouncedQuery = useDebouncedValue(query, 300)
 
-  // Viewer (solo 1 imagen)
+  // Viewer
   const [viewerImage, setViewerImage] = useState<string | null>(null)
 
-  // Modal “elige sede” para WhatsApp
+  // WhatsApp
   const [inquiryItem, setInquiryItem] = useState<PhotoItem | null>(null)
   const [inquiryImg, setInquiryImg] = useState<string>('')
 
-  // Modales admin (sin título)
+  // Admin modals
   const [editOpen, setEditOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [current, setCurrent] = useState<PhotoItem | null>(null)
   const [editCategory, setEditCategory] = useState('')
   const [editTags, setEditTags] = useState('')
 
-  // Cargar Firestore (categorías + gallery)
+  /** Leer parámetros iniciales de la URL y aplicarlos a filtros */
+  useEffect(() => {
+    const cat = searchParams.get('categoria')
+    const tag = searchParams.get('etiqueta')
+    if (cat) setCategory(cat)
+    if (tag) setSelectedTags([tag.toLowerCase()])
+    // no dependencias para que sólo se ejecute al montar
+  }, [])
+
+  /** Cargar datos Firestore */
   useEffect(() => {
     const load = async () => {
       try {
@@ -191,9 +154,11 @@ export default function GallerySection({
         const list: PhotoItem[] = gSnap.docs.map((d) => {
           const data = d.data() as FirestoreGalleryData
           const created =
-            (typeof data?.createdAt === 'object' &&
-              typeof data.createdAt?.toMillis === 'function' &&
-              data.createdAt.toMillis()) ||
+           (typeof data?.createdAt === 'object' &&
+  'toMillis' in data.createdAt &&
+  typeof data.createdAt.toMillis === 'function' &&
+  data.createdAt.toMillis())
+ ||
             (typeof data?.createdAt === 'number' && data.createdAt) ||
             (typeof data?.createdAt === 'string' && Date.parse(data.createdAt)) ||
             0
@@ -202,6 +167,7 @@ export default function GallerySection({
           const tags: string[] = Array.isArray(rawTags)
             ? (rawTags.filter((t): t is string => typeof t === 'string') as string[])
             : []
+          const tagsNorm = tags.map((t) => normalizeTag(t)).filter(Boolean)
 
           return {
             id: d.id,
@@ -211,6 +177,7 @@ export default function GallerySection({
             deleteToken: data?.deleteToken,
             category: data?.category || '',
             tags,
+            tagsNorm,
             createdAt: created,
             description: data?.description,
             author: data?.author,
@@ -219,9 +186,24 @@ export default function GallerySection({
 
         setItems(list)
 
-        const tagSet = new Set<string>()
-        list.forEach((it) => it.tags.forEach((t) => t && tagSet.add(t)))
-        setAllTags(Array.from(tagSet).sort((a, b) => a.localeCompare(b)))
+        // Construir catálogo de etiquetas
+        const stats = new Map<string, UiTag>()
+        list.forEach((it) => {
+          (it.tags ?? []).forEach((raw) => {
+            const norm = normalizeTag(raw)
+            if (!norm) return
+            const label = prettyTag(raw)
+            const prev = stats.get(norm)
+            if (prev) {
+              prev.count += 1
+              if (label.length > prev.label.length) prev.label = label
+            } else {
+              stats.set(norm, { norm, label, count: 1 })
+            }
+          })
+        })
+        const catalog = Array.from(stats.values()).sort((a, b) => b.count - a.count)
+        setTagCatalog(catalog)
       } catch (e) {
         console.error(e)
         setError('No se pudieron cargar los datos')
@@ -232,15 +214,26 @@ export default function GallerySection({
     void load()
   }, [])
 
-  // Filtro + búsqueda + orden (SIN título)
+  /** Filtro + búsqueda + orden */
   const filtered = useMemo(() => {
     let list = items
     if (category !== 'todas') list = list.filter((it) => it.category === category)
-    if (selectedTags.length) list = list.filter((it) => selectedTags.every((t) => it.tags.includes(t)))
-    const q = debouncedQuery.trim().toLowerCase()
-    if (q) {
-      list = list.filter((it) => it.tags.some((tg) => tg.toLowerCase().includes(q)))
+
+    if (selectedTags.length) {
+      list = list.filter((it) => {
+        const norms = it.tagsNorm ?? it.tags.map(normalizeTag)
+        return selectedTags.every((t) => norms.includes(t))
+      })
     }
+
+    const q = normalizeTag(debouncedQuery)
+    if (q) {
+      list = list.filter((it) => {
+        const norms = it.tagsNorm ?? it.tags.map(normalizeTag)
+        return norms.some((tg) => tg.includes(q))
+      })
+    }
+
     list = [...list].sort((a, b) => {
       if (sortBy === 'titulo') return (a.title || '').localeCompare(b.title || '')
       const da = new Date(a.createdAt || 0).getTime()
@@ -250,16 +243,35 @@ export default function GallerySection({
     return list
   }, [items, category, selectedTags, debouncedQuery, sortBy])
 
-  // reset visible al cambiar filtros
+  /** Reset de paginado al cambiar filtros */
   useEffect(() => setVisible(pageSize), [debouncedQuery, category, selectedTags, sortBy, pageSize])
 
-  const toggleTag = (t: string) =>
-    setSelectedTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
+  /** Cambiar categoría + actualizar URL */
+  const onChangeCategory = (value: string) => {
+    setCategory(value)
+    const params = new URLSearchParams(searchParams)
+    if (value && value !== 'todas') params.set('categoria', value)
+    else params.delete('categoria')
+    setSearchParams(params)
+  }
+
+  /** Toggle etiqueta (single principal en URL) */
+  const toggleTag = (norm: string) => {
+    setSelectedTags((prev) => {
+      const exists = prev.includes(norm)
+      const updated = exists ? prev.filter((x) => x !== norm) : [norm]
+      const params = new URLSearchParams(searchParams)
+      if (updated.length > 0) params.set('etiqueta', updated[0])
+      else params.delete('etiqueta')
+      setSearchParams(params)
+      return updated
+    })
+  }
 
   const hasMore = visible < filtered.length
   const toShow = filtered.slice(0, visible)
 
-  // ======= Admin actions =======
+  /** Admin: abrir/guardar/eliminar */
   const openEdit = (item: PhotoItem) => {
     setCurrent(item)
     setEditCategory(item.category || '')
@@ -271,10 +283,12 @@ export default function GallerySection({
     if (!current) return
     const ref = doc(db, 'gallery', current.id)
     const newTags = editTags.split(',').map((t) => t.trim()).filter(Boolean)
-    await updateDoc(ref, { category: editCategory, tags: newTags }) // ← sin título
+    await updateDoc(ref, { category: editCategory, tags: newTags })
     setItems((prev) =>
       prev.map((it) =>
-        it.id === current.id ? { ...it, category: editCategory, tags: newTags } : it,
+        it.id === current.id
+          ? { ...it, category: editCategory, tags: newTags, tagsNorm: newTags.map(normalizeTag) }
+          : it,
       ),
     )
     setEditOpen(false)
@@ -344,7 +358,7 @@ export default function GallerySection({
             <div className="select-wrap">
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => onChangeCategory(e.target.value)}
                 aria-label="Filtrar por categor\u00eda"
               >
                 <option value="todas">Todas las categorías</option>
@@ -366,22 +380,34 @@ export default function GallerySection({
             </div>
           </div>
 
-          {allTags.length > 0 && (
+          {tagCatalog.length > 0 && (
             <div className="chips" role="group" aria-label="Filtrar por etiquetas">
-              {allTags.map((t) => {
-                const active = selectedTags.includes(t)
+              {(showAllTags ? tagCatalog : tagCatalog.slice(0, 12)).map(({ norm, label, count }) => {
+                const active = selectedTags.includes(norm)
                 return (
                   <button
-                    key={t}
+                    key={norm}
                     className={`chip ${active ? 'active' : ''}`}
-                    onClick={() => toggleTag(t)}
+                    onClick={() => toggleTag(norm)}
                     aria-pressed={active}
                     type="button"
+                    title={`${count} coincidencia${count === 1 ? '' : 's'}`}
                   >
-                    {t}
+                    {label}
                   </button>
                 )
               })}
+
+              {tagCatalog.length > 12 && (
+                <button
+                  className="chip clear"
+                  onClick={() => setShowAllTags((v) => !v)}
+                  type="button"
+                >
+                  {showAllTags ? 'Ver menos' : `Ver todas (${tagCatalog.length})`}
+                </button>
+              )}
+
               {selectedTags.length > 0 && (
                 <button className="chip clear" onClick={() => setSelectedTags([])} type="button">
                   Limpiar etiquetas
@@ -391,7 +417,6 @@ export default function GallerySection({
           )}
         </header>
 
-        {/* Loading */}
         {loading && <div className="empty"><p>Cargando galería…</p></div>}
         {error && !loading && <div className="empty"><p>{error}</p></div>}
 
@@ -412,7 +437,6 @@ export default function GallerySection({
                     exit={{ opacity: 0, scale: 0.98 }}
                     transition={{ duration: 0.28 }}
                   >
-                    {/* Imagen + ribbon */}
                     <div
                       className="thumb-wrap thumb-wrap--frame clickable"
                       onClick={() => setViewerImage(imgBig)}
@@ -425,7 +449,6 @@ export default function GallerySection({
                       <img src={imgSmall} alt="Pedido" loading="lazy" decoding="async" />
                     </div>
 
-                    {/* Acciones debajo */}
                     <figcaption className="tile-caption">
                       {isAdmin ? (
                         <div className="tile-actions">
@@ -462,20 +485,12 @@ export default function GallerySection({
         )}
       </div>
 
-      {/* ===== Viewer (solo imagen clicada) ===== */}
+      {/* Viewer */}
       {viewerImage && (
-        <div className="image-viewer-backdrop" onClick={() => setViewerImage(null)} role="button" tabIndex={0}>
-          <img
-            src={viewerImage}
-            alt="Vista ampliada"
-            className="image-viewer-img"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button className="image-viewer-close" onClick={() => setViewerImage(null)} aria-label="Cerrar vista" type="button">✕</button>
-        </div>
+        <ViewerOverlay src={viewerImage} onClose={() => setViewerImage(null)} />
       )}
 
-      {/* ===== Modal elegir sede para WhatsApp (MÁS INFO) ===== */}
+      {/* Modal WhatsApp */}
       {inquiryItem && (
         <div className="modal-backdrop" onClick={() => { setInquiryItem(null); setInquiryImg('') }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -501,10 +516,16 @@ export default function GallerySection({
               </button>
             </div>
           </div>
+
+          <style>{`
+            .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.35); display:grid; place-items:center; z-index:9999; }
+            .modal { width:min(560px,92vw); background:#fff; border-radius:16px; border:1px solid #eee; box-shadow:0 20px 60px rgba(0,0,0,.2); padding:18px; }
+            .grid { display:grid; gap:12px; }
+          `}</style>
         </div>
       )}
 
-      {/* ===== Modales admin ===== */}
+      {/* Modales admin */}
       {editOpen && current && (
         <Modal onClose={() => setEditOpen(false)} title="Editar imagen">
           <div className="grid cols-2">
@@ -551,7 +572,7 @@ export default function GallerySection({
         </Modal>
       )}
 
-      {/* ===== Estilos (tiles + ribbon + viewer + modal) ===== */}
+      {/* Estilos locales de la sección */}
       <style>{`
         .photo-tile {
           position: relative;
@@ -582,7 +603,6 @@ export default function GallerySection({
         .btn.sm { padding:8px 12px; border-radius:12px; font-size:.9rem; }
         .btn.danger { background:#ef4444; } .btn.danger:hover { background:#f87171; }
 
-        /* Ribbon */
         .ribbon {
           position: absolute; top: 10px; left: 10px; z-index: 2;
           display: inline-flex; align-items: center; gap: 6px;
@@ -592,76 +612,15 @@ export default function GallerySection({
           backdrop-filter: blur(4px);
         }
         .ribbon i { font-style: normal; opacity: .95; }
-
         .ribbon.cumple { background: linear-gradient(135deg, #8aa7ff, #b76cfd); }
         .ribbon.baby-shower { background: linear-gradient(135deg, #f8aee3, #6be4dc); color:#3a2e4e; }
         .ribbon.chocolate { background: linear-gradient(135deg, #a77979, #e0b9a8); }
 
-        /* Viewer */
-        .image-viewer-backdrop {
-          position: fixed; inset: 0; background: rgba(0,0,0,0.8);
-          display: grid; place-items: center; z-index: 2000; cursor: zoom-out; animation: fadeIn .25s ease;
-        }
-        .image-viewer-img {
-          max-width: 95vw; max-height: 90vh; border-radius: 16px;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5); cursor: default;
-        }
-        .image-viewer-close {
-          position: absolute; top: 24px; right: 24px;
-          background: rgba(255,255,255,0.9); color:#111; border:none;
-          border-radius:999px; width:42px; height:42px; font-size:22px; font-weight:700;
-          display:grid; place-items:center; cursor:pointer;
-        }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+        .chip.clear{ background:#fff; color:#5b21b6; border:1px dashed #c4b5fd; }
 
-        /* Modal genérico */
-        .modal-backdrop {
-          position:fixed; inset:0; background:rgba(0,0,0,.35);
-          display:grid; place-items:center; z-index:9999;
-        }
-        .modal {
-          width:min(560px,92vw); background:#fff; border-radius:16px; border:1px solid #eee;
-          box-shadow:0 20px 60px rgba(0,0,0,.2); padding:18px;
-        }
-        .modal h3 { margin:0 0 6px; font-size:1.22rem; }
-        .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
-        .grid { display:grid; gap:12px; }
-        @media (min-width:768px){ .grid.cols-2 { grid-template-columns:1fr 1fr; } }
-        .input-wrap { display:flex; flex-direction:column; gap:6px; }
-        .input-wrap input, .input-wrap select { padding:10px 12px; border-radius:12px; border:1px solid #e5e7eb; }
-
-        .gallery-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 18px;
-        }
+        .empty { display:grid; place-items:center; min-height: 120px; }
       `}</style>
     </section>
-  )
-}
-
-/** Modal interno minimalista (click fuera para cerrar) */
-function Modal({
-  title,
-  children,
-  onClose,
-}: {
-  title: string
-  children: React.ReactNode
-  onClose: () => void
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{title}</h3>
-        {children}
-      </div>
-    </div>
   )
 }
