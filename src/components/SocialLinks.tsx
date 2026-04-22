@@ -31,16 +31,15 @@ const socials: Social[] = [
   },
 ]
 
-// WhatsApp por sede
+// SOLO MIRANDA
 const waMiranda =
-  'https://wa.me/573155287225?text=' + encodeURIComponent('¡Hola!')
-const waFlorida =
-  'https://wa.me/573150815246?text=' + encodeURIComponent('¡Hola!')
+  'https://wa.me/573155287225?text=' +
+  encodeURIComponent('¡Hola! Quiero hacer un pedido 😊')
 
-// Íconos SVG minimal
+// Íconos
 const Icon = {
   ig: () => (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
       <rect
         x="3"
         y="3"
@@ -55,7 +54,7 @@ const Icon = {
     </svg>
   ),
   tt: () => (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
       <path
         d="M14 3v6.5a4.5 4.5 0 1 1-4.5-4.5"
         stroke="currentColor"
@@ -71,7 +70,7 @@ const Icon = {
     </svg>
   ),
   fb: () => (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
       <path
         d="M14 9h3V6h-3a3 3 0 0 0-3 3v3H8v3h3v6h3v-6h3l1-3h-4V9a1 1 0 0 1 1-1z"
         fill="currentColor"
@@ -79,7 +78,7 @@ const Icon = {
     </svg>
   ),
   wa: () => (
-    <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
+    <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
       <path
         d="M16 3C9.37 3 4 8.37 4 15c0 2.1.54 4.1 1.49 5.83L4 29l8.4-1.46A11.9 11.9 0 0 0 16 27c6.63 0 12-5.37 12-12S22.63 3 16 3z"
         fill="currentColor"
@@ -92,14 +91,14 @@ const Icon = {
   ),
 }
 
-// Animaciones suaves
+// Animaciones
 const container = {
   hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
+  show: { opacity: 1, transition: { staggerChildren: 0.1 } },
 }
 const item = {
-  hidden: { opacity: 0, y: 10, scale: 0.97 },
-  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4 } },
+  hidden: { opacity: 0, y: 20, scale: 0.96 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45 } },
 }
 
 export default function SocialLinks() {
@@ -111,24 +110,28 @@ export default function SocialLinks() {
       style={{
         background:
           'linear-gradient(180deg,#fff7fe 0%,#f9faff 40%,#fff1f7 100%)',
+        paddingBlock: '80px',
       }}
     >
-      <header data-reveal style={{ textAlign: 'center', marginBottom: 24 }}>
-        <h2 id="redes-title" className="h2">
-          Síguenos y antójate
-        </h2>
+      <header style={{ textAlign: 'center', marginBottom: 32 }}>
+        <h2 className="h2">Síguenos y antójate</h2>
         <p className="lead">
-          Promos, nuevos sabores y un vistazo al detrás de nuestras creaciones.
+          Promos, nuevos sabores y lo mejor de Pastelería Nancy ✨
         </p>
       </header>
 
-      {/* Redes Sociales */}
+      {/* REDES MÁS GRANDES */}
       <motion.div
-        className="social-center"
         variants={container}
         initial="hidden"
         whileInView="show"
-        viewport={{ once: true, amount: 0.2 }}
+        viewport={{ once: true }}
+        style={{
+          display: 'grid',
+          gap: 16,
+          maxWidth: 520,
+          margin: '0 auto',
+        }}
       >
         {socials.map((s) => (
           <motion.a
@@ -136,26 +139,23 @@ export default function SocialLinks() {
             href={s.href}
             target="_blank"
             rel="noreferrer"
-            className={`social-card ${s.id}`}
             variants={item}
             whileHover={{
-              y: -4,
-              boxShadow: '0 10px 24px rgba(183,108,253,0.25)',
-              scale: 1.03,
+              y: -6,
+              scale: 1.04,
+              boxShadow: '0 14px 30px rgba(0,0,0,0.12)',
             }}
             style={{
-              borderRadius: 18,
+              borderRadius: 20,
               background: '#fff',
-              border: '1px solid #eadfff',
-              padding: '16px 18px',
+              border: '1px solid #eee',
+              padding: '18px 20px',
               display: 'flex',
               alignItems: 'center',
-              gap: 14,
-              transition: 'all 0.2s ease',
+              gap: 16,
             }}
           >
             <span
-              className="icon"
               style={{
                 color:
                   s.id === 'instagram'
@@ -173,64 +173,46 @@ export default function SocialLinks() {
                 <Icon.fb />
               )}
             </span>
-            <div className="text" style={{ textAlign: 'left' }}>
-              <strong style={{ fontSize: '16px', display: 'block' }}>
-                {s.label}
-              </strong>
-              <span className="handle" style={{ color: '#857b9a' }}>
-                {s.handle}
-              </span>
+
+            <div style={{ textAlign: 'left' }}>
+              <strong style={{ fontSize: 17 }}>{s.label}</strong>
+              <div style={{ color: '#777' }}>{s.handle}</div>
             </div>
           </motion.a>
         ))}
       </motion.div>
 
-      {/* WhatsApp modernizado */}
+      {/* CTA PRINCIPAL WHATSAPP */}
       <motion.div
-        className="wa-wrap"
-        variants={container}
-        initial="hidden"
-        whileInView="show"
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         style={{
-          marginTop: 36,
-          gap: 16,
+          marginTop: 40,
           display: 'flex',
-          flexWrap: 'wrap',
           justifyContent: 'center',
         }}
       >
-        {[
-          { href: waMiranda, label: 'Sede Miranda' },
-          { href: waFlorida, label: 'Sede Florida' },
-        ].map((w, i) => (
-          <motion.a
-            key={i}
-            href={w.href}
-            target="_blank"
-            rel="noreferrer"
-            variants={item}
-            whileHover={{
-              scale: 1.05,
-              boxShadow: '0 8px 20px rgba(37,211,102,0.25)',
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              background: 'linear-gradient(90deg,#25D366,#128C7E)',
-              color: '#fff',
-              borderRadius: 999,
-              padding: '12px 20px',
-              fontWeight: 700,
-              boxShadow: '0 6px 14px rgba(37,211,102,0.3)',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <Icon.wa />
-            WhatsApp {w.label}
-          </motion.a>
-        ))}
+        <a
+          href={waMiranda}
+          target="_blank"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            background: 'linear-gradient(90deg,#25D366,#128C7E)',
+            color: '#fff',
+            borderRadius: 999,
+            padding: '16px 28px',
+            fontWeight: 700,
+            fontSize: 16,
+            boxShadow: '0 10px 25px rgba(37,211,102,0.35)',
+            transition: 'all 0.25s ease',
+          }}
+        >
+          <Icon.wa />
+          Hacer pedido por WhatsApp
+        </a>
       </motion.div>
     </Section>
   )

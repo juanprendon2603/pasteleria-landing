@@ -4,7 +4,6 @@ import { useEffect } from 'react'
 
 export default function Header() {
   useEffect(() => {
-    // Añade/quita la clase "scrolled" al hacer scroll (opcional)
     const header = document.querySelector<HTMLElement>('.header')
     const onScroll = () => {
       if (!header) return
@@ -14,6 +13,11 @@ export default function Header() {
     onScroll()
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // LINK WHATSAPP
+  const whatsappLink =
+    'https://wa.me/573155287225?text=' +
+    encodeURIComponent('¡Hola! Quiero hacer un pedido 😊')
 
   return (
     <header className="header">
@@ -28,10 +32,20 @@ export default function Header() {
         </div>
 
         <div className="actions">
-          <a className="btn secondary" href="#sedes">
-            Sedes
+          <a className="btn secondary" href="/galeria">
+            Galeria
           </a>
-          <a className="btn" href="#contacto">
+          <a className="btn secondary" href="#sedes">
+            Sede
+          </a>
+
+          {/* BOTÓN WHATSAPP */}
+          <a
+            className="btn"
+            href={whatsappLink}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             Contactar
           </a>
         </div>

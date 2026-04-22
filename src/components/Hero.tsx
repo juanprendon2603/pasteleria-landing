@@ -50,7 +50,7 @@ export default function Hero() {
               aria-label="Acciones principales"
             >
               <a className="btn btn-lg" href="#sedes">
-                Ver sedes
+                Ver sede
               </a>
               <a className="btn secondary btn-lg" href="#redes">
                 Síguenos
